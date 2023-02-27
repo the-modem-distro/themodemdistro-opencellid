@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Simple script to download the full tower database from OpenCellid
+# and extract its content to independent files
+#
+TOKEN="YOUR_API_KEY_HERE"
+URL="https://opencellid.org/ocid/downloads?token=${TOKEN}&type=full&file=cell_towers.csv.gz"
+OUTPUT_FILE="cell_towers.csv.gz"
+OUTPUT_FILE_EXPAND="cell_towers.csv"
+WEB_SERVER_PATH="/PATH/TO/SERVER_PATH/"
+SCRIPT_PATH="/opt/opencellid"
+mkdir -p ${SCRIPT_PATH}/out || exit "Error creating output folder"
+mkdir -p ${SCRIPT_PATH}/tmp || exit "Error creating temporary directory"
+rm ${SCRIPT_PATH}/out/*.bin
+rm ${SCRIPT_PATH}/out/*.sha
+rm ${SCRIPT_PATH}/out/shasums.txt
+rm ${SCRIPT_PATH}/tmp/${OUTPUT_FILE} || echo ${OUTPUT_FILE}" didn't exist"
+rm ${SCRIPT_PATH}/tmp/${OUTPUT_FILE_EXPAND} || echo ${OUTPUT_FILE_EXPAND}" didn't exist"
+curl -o ${SCRIPT_PATH}/tmp/${OUTPUT_FILE} -f ${URL} || exit "Error getting the database file"
+gunzip ${SCRIPT_PATH}/tmp/${OUTPUT_FILE} || exit "Error expanding the file"
+cd ${SCRIPT_PATH} && ./ocidconv tmp/${OUTPUT_FILE_EXPAND} || exit "Error extracting data from the DB"
+cd ${SCRIPT_PATH}/out && sha512sum * > ../shasums.txt && mv ../shasums.txt ./
+cd ${SCRIPT_PATH}/out && for  FILE in *.bin ; do sha512sum $FILE > $FILE.sha ; done 
+rm ${WEB_SERVER_PATH}*.bin
+rm ${WEB_SERVER_PATH}*.sha
+rm ${WEB_SERVER_PATH}shasums.txt
+mv ${SCRIPT_PATH}/out/* ${WEB_SERVER_PATH} && \
+chown nobody.nobody ${WEB_SERVER_PATH} -Rv ; echo "Finished!"
